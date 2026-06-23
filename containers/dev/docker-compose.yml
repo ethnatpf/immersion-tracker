@@ -6,7 +6,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DSN: postgres://kratos:kratos_password@postgres:5432/kratos?sslmode=disable
+      DSN: postgres://kratos_user:dev@postgres:5432/kratos?sslmode=disable
     volumes:
       - ./kratos:/etc/config/kratos
     networks:
@@ -20,7 +20,7 @@ services:
       kratos-migrate:
         condition: service_completed_successfully
     environment:
-      DSN: postgres://kratos:kratos_password@postgres:5432/kratos?sslmode=disable
+      DSN: postgres://kratos_user:dev@postgres:5432/kratos?sslmode=disable
     volumes:
       - ./kratos:/etc/config/kratos
     networks:
@@ -34,11 +34,12 @@ services:
   postgres:
     image: postgres:18
     environment:
-      POSTGRES_USER: kratos
-      POSTGRES_PASSWORD: kratos_password
-      POSTGRES_DB: kratos
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev # It's fine to hardcode it for development
+      POSTGRES_DB: postgres
     volumes:
       - postgres_data:/var/lib/postgresql
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
     networks:
       - internal
     healthcheck:
@@ -47,7 +48,6 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-
 volumes:
   postgres_data:
 
