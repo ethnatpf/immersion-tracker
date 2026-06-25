@@ -24,6 +24,9 @@ export function useKratosError() {
         case "self_service_flow_expired":
           refreshFlow();
           return;
+        case "session_already_available":
+          // User is already signed in, redirect him to the home page (dashboard)
+          return router.push("/dashboard");
       }
     }
 

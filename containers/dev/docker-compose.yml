@@ -14,11 +14,21 @@ services:
     command: migrate sql -e --yes -c /etc/config/kratos/kratos.yml
     restart: "no"
 
+  mailslurper:
+    image: oryd/mailslurper:latest-smtps
+    ports:
+      - "4436:4436" # Web UI
+      - "4437:4437" # API
+    networks:
+      - internal
+
   kratos:
     image: oryd/kratos:v26.2.0
     depends_on:
       kratos-migrate:
         condition: service_completed_successfully
+      mailslurper:
+        condition: service_started
     environment:
       DSN: postgres://kratos_user:dev@postgres:5432/kratos?sslmode=disable
     volumes:

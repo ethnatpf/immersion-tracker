@@ -1,19 +1,20 @@
 "use client";
+
 import KratosMessage from "@/components/kratos/message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { useKratosError } from "@/hooks/kratos";
 import { extractMessages, isFlow, kratosFrontendApi } from "@/lib/kratos";
-import { RegistrationFlow } from "@ory/kratos-client";
+import { LoginFlow } from "@ory/kratos-client";
 import { isAxiosError } from "axios";
 import clsx from "clsx";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-export default function SignUpView() {
-  const [flow, setFlow] = useState<RegistrationFlow>();
+export default function SignInView() {
+  const [flow, setFlow] = useState<LoginFlow>();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const router = useRouter();
@@ -32,12 +33,12 @@ export default function SignUpView() {
   useEffect(() => {
     if (flowId) {
       kratosFrontendApi
-        .getRegistrationFlow({ id: flowId })
+        .getLoginFlow({ id: flowId })
         .then((res) => setFlow(res.data))
         .catch(handleKratosError);
     } else {
       kratosFrontendApi
-        .createBrowserRegistrationFlow()
+        .createBrowserLoginFlow()
         .then((res) => {
           setFlow(res.data);
           const params = new URLSearchParams(searchParams);
@@ -54,7 +55,6 @@ export default function SignUpView() {
       event.preventDefault();
 
       const formData = new FormData(event.target);
-      const name = formData.get("name");
       const email = formData.get("email");
       const password = formData.get("password");
       const csrfToken = flow!.ui.nodes.find(
@@ -63,23 +63,17 @@ export default function SignUpView() {
       )?.attributes?.value;
 
       const response = await kratosFrontendApi
-        .updateRegistrationFlow({
+        .updateLoginFlow({
           flow: flow!.id,
-          updateRegistrationFlowBody: {
+          updateLoginFlowBody: {
             method: "password",
             csrf_token: csrfToken,
             password: password as string,
-            traits: {
-              email,
-              name,
-            },
+            identifier: email as string,
           },
         })
         .catch((err) => {
-          if (
-            isAxiosError(err) &&
-            isFlow<RegistrationFlow>(err.response?.data)
-          ) {
+          if (isAxiosError(err) && isFlow<LoginFlow>(err.response?.data)) {
             setFlow(err.response.data);
           } else {
             handleKratosError(err);
@@ -87,7 +81,7 @@ export default function SignUpView() {
         });
 
       if (response) {
-        router.push("/auth/sign-in");
+        router.push("/dashboard");
       }
     } finally {
       setIsSubmitting(false);
@@ -95,14 +89,14 @@ export default function SignUpView() {
   }
 
   const messages = extractMessages(flow);
-  const nameMessages = messages.nodes["traits.name"];
   const emailMessages = messages.nodes["traits.email"];
   const passwordMessages = messages.nodes.password;
 
   return (
     <form onSubmit={handleSubmit}>
+      {/* Sign-in section */}
       <h2 className="text-2xl font-space-grotestk mb-1 font-bold tracking-tight">
-        Start immersing
+        Welcome back
       </h2>
       <h1
         className={clsx(
@@ -110,7 +104,7 @@ export default function SignUpView() {
           messages.global.length === 0 ? "mb-6" : "mb-3",
         )}
       >
-        Create your free account — takes 30 seconds.
+        Log in to your immersion tracker.
       </h1>
 
       {messages.global.length > 0 && (
@@ -121,28 +115,6 @@ export default function SignUpView() {
         />
       )}
 
-      {/* Name input & label*/}
-      <div className="mb-4 mt-3">
-        <label
-          htmlFor="name-input"
-          className="text-[12px] text-muted-text font-semibold block mb-1"
-        >
-          NAME
-        </label>
-        <Input
-          aria-invalid={nameMessages?.hasError}
-          required
-          name="name"
-          placeholder="John Doe"
-          className="mt-1 w-full"
-          autoComplete="name"
-          id="name-input"
-        />
-        {nameMessages?.messages?.length > 0 && (
-          <KratosMessage variant="text" message={nameMessages?.messages?.[0]} />
-        )}
-      </div>
-
       {/* Email input & label */}
       <div className="mb-4">
         <label
@@ -152,10 +124,10 @@ export default function SignUpView() {
           EMAIL
         </label>
         <Input
-          aria-invalid={emailMessages?.hasError}
-          required
           name="email"
+          required
           placeholder="you@example.com"
+          aria-invalid={emailMessages?.hasError}
           className="mt-1 w-full"
           autoComplete="email"
           id="email-input"
@@ -168,23 +140,32 @@ export default function SignUpView() {
         )}
       </div>
 
-      {/* Password input and label*/}
+      {/* Password input & label */}
       <div className="mb-5">
-        <label
-          htmlFor="password-input"
-          className="text-[12px] text-muted-text font-semibold block mb-1"
-        >
-          PASSWORD
-        </label>
+        <div className="mb-1 flex justify-between text-[12px]">
+          <label
+            htmlFor="password-input"
+            className="text-muted-text font-semibold block"
+          >
+            PASSWORD
+          </label>
+
+          <Link
+            className="text-primary-light font-semibold"
+            href="/auth/forgot-password"
+          >
+            Forgot password?
+          </Link>
+        </div>
         <Input
-          aria-invalid={messages.nodes.password?.hasError}
-          required
-          type="password"
           name="password"
+          required
+          aria-invalid={passwordMessages?.hasError}
+          autoComplete="current-password"
+          type="password"
           placeholder="••••••••"
-          className="mt-1 mb-2 w-full"
-          autoComplete="new-password"
-          id="password-input"
+          className="mt-1 w-full"
+          id="email-input"
         />
         {passwordMessages?.messages?.length > 0 && (
           <KratosMessage
@@ -194,15 +175,17 @@ export default function SignUpView() {
         )}
       </div>
 
-      <Button disabled={isSubmitting} type="submit" className="w-full">
+      <Button className="w-full" disabled={isSubmitting}>
         {isSubmitting && <Spinner data-icon="inline-start" />}
-        Create account
+        Sign in
       </Button>
 
       <div className="text-center mt-6 text-[12px]">
-        <span className="text-muted-text mr-1">Already have an account?</span>
-        <Link href="/auth/sign-in" className="text-primary-light font-semibold">
-          Sign in
+        <span className="text-muted-text mr-1">
+          Don&apos;t have an account?
+        </span>
+        <Link href="/auth/sign-up" className="text-primary-light font-semibold">
+          Sign up
         </Link>
       </div>
     </form>
